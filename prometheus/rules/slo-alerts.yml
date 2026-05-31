@@ -1,0 +1,48 @@
+groups:
+  - name: slo_burn_rate_alerts
+    interval: 1m
+    rules:
+      # Fast burn — page immediately (1h + 5m windows, 14.4x threshold)
+      - alert: HighErrorBudgetBurnRate
+        expr: |
+          (
+            job:slo_errors:rate1h / (1 - 0.999) > 14.4
+            and
+            job:slo_errors:rate5m / (1 - 0.999) > 14.4
+          )
+        for: 2m
+        labels:
+          severity: page
+          slo: api-availability
+        annotations:
+          summary: "High error budget burn rate — {{ $labels.job }}"
+          description: "Burning error budget at {{ $value | humanize }}x rate (1h window). Will exhaust 30-day budget in ~2h."
+          runbook_url: "https://runbooks.example.com/slo-high-burn-rate"
+
+      # Slow burn — create ticket (6h + 30m windows, 3x threshold)
+      - alert: ElevatedErrorBudgetBurnRate
+        expr: |
+          (
+            job:slo_errors:rate6h / (1 - 0.999) > 3
+            and
+            job:slo_errors:rate30m / (1 - 0.999) > 3
+          )
+        for: 15m
+        labels:
+          severity: warning
+          slo: api-availability
+        annotations:
+          summary: "Elevated error budget burn — {{ $labels.job }}"
+          description: "Slow burn at {{ $value | humanize }}x — budget will exhaust in ~5 days. Create ticket."
+          runbook_url: "https://runbooks.example.com/slo-slow-burn"
+
+      # Budget nearly exhausted
+      - alert: ErrorBudgetNearlyExhausted
+        expr: |
+          slo:error_budget_remaining:ratio < 0.10
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Error budget < 10% remaining — {{ $labels.job }}"
+          description: "Only {{ $value | humanizePercentage }} of error budget left for the current 30-day window."
